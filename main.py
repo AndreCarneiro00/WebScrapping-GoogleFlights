@@ -16,6 +16,7 @@ def get_web_data(airport_from, airport_to, departure_dt, comeback_dt):
     first = True
     for departure in airport_from:
         for arrival in airport_to:
+            print(f"{departure}-{arrival}")
             inputs = driver.find_elements(By.TAG_NAME, "input")
             input_from = ""
             input_to = ""
@@ -102,6 +103,7 @@ def get_web_data(airport_from, airport_to, departure_dt, comeback_dt):
     return lst_flighs
 
 def store_data(lst_flighs):
+    print("Inserting collected data into flights.db")
     con = sqlite3.connect("flights.db")
     cur = con.cursor()
     # cur.execute("""CREATE TABLE IF NOT EXISTS flights (search_dt DATETIME, departure_airport NVARCHAR(3),
