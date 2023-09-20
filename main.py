@@ -1,83 +1,127 @@
-import time
+from time import sleep
+from datetime import datetime
+import sqlite3
+import regex as re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.wait import WebDriverWait
 
-driver = webdriver.Chrome()
+def get_web_data(airport_from, airport_to, departure_dt, comeback_dt):
+    driver = webdriver.Chrome()
+    driver.get("https://www.google.com/travel/flights?hl=pt-BR")
+    driver.maximize_window()
 
-driver.get("https://www.google.com/travel/flights?hl=pt-BR")
-driver.maximize_window()
+    # Inserting each flight into the search form and getting the minimum price
+    lst_flighs = []
+    first = True
+    for departure in airport_from:
+        for arrival in airport_to:
+            inputs = driver.find_elements(By.TAG_NAME, "input")
+            input_from = ""
+            input_to = ""
+            for _input in inputs:
+                acessible_name = _input.accessible_name
+                if "De onde?" in acessible_name:
+                    input_from = _input
+                if "Para onde?" in acessible_name:
+                    input_to = _input
 
-inputs = driver.find_elements(By.TAG_NAME, "input")
-input_from = ""
-input_to = ""
-input_departure = ""
-for _input in inputs:
-    acessible_name = _input.accessible_name
-    if "De onde?" in acessible_name:
-        input_from = _input
-    if "Para onde?" in acessible_name:
-        input_to = _input
-    if "Partida" in acessible_name:
-        input_departure = _input
+            input_from.clear()
+            input_from.send_keys(departure)
+            sleep(2)
+            dropdown_options = driver.find_elements(By.TAG_NAME, "li")
+            dropdown_option = [option for option in dropdown_options if f"\n{departure}\n" in option.text][0]
+            dropdown_option.click()
 
-departure = "GRU"
-arrival = "LAX"
-dt_departure = "20/09/2023"
-dt_comeback = "25/09/2023"
+            input_to.clear()
+            input_to.send_keys(arrival)
+            sleep(2)
+            dropdown_options = driver.find_elements(By.CLASS_NAME, "P1pPOe")
+            dropdown_option = [option for option in dropdown_options if f"{arrival}" in option.text][0]
+            dropdown_option.click()
 
-input_from.clear()
-input_from.send_keys(departure)
-time.sleep(1)
-dropdown_options = driver.find_elements(By.TAG_NAME, "li")
-dropdown_option = [option for option in dropdown_options if f"\n{departure}\n" in option.text][0]
-dropdown_option.click()
+            if first:
+                # Inserting the dates into the search form if first interation
+                inputs = driver.find_elements(By.TAG_NAME, "input")
+                input_departure = ""
+                for _input in inputs:
+                    acessible_name = _input.accessible_name
+                    if "Partida" in acessible_name:
+                        input_departure = _input
 
-input_to.send_keys(arrival)
-time.sleep(1)
-dropdown_options = driver.find_elements(By.CLASS_NAME, "P1pPOe")
-dropdown_option = [option for option in dropdown_options if f"{arrival}" in option.text][0]
-dropdown_option.click()
+                input_departure.click()
+                sleep(1)
+                inputs = driver.find_elements(By.TAG_NAME, "input")
+                input_departure = ""
+                input_comeback = ""
+                for _input in inputs:
+                    acessible_name = _input.accessible_name
+                    if "Partida" in acessible_name:
+                        input_departure = _input
+                    if "Volta" in acessible_name:
+                        input_comeback = _input
 
-input_departure.click()
-inputs = driver.find_elements(By.TAG_NAME, "input")
-input_departure = ""
-input_comeback = ""
-for _input in inputs:
-    acessible_name = _input.accessible_name
-    if "Partida" in acessible_name:
-        input_departure = _input
-    if "Volta" in acessible_name:
-        input_comeback = _input
-input_departure.send_keys(dt_departure)
-input_comeback.send_keys(dt_comeback)
-input_comeback.send_keys(Keys.ENTER)
-buttons = driver.find_elements(By.TAG_NAME, "button")
+                sleep(1)
+                input_departure.send_keys(departure_dt)
+                sleep(1)
+                input_comeback.send_keys(comeback_dt)
+                sleep(1)
+                input_comeback.send_keys(Keys.ENTER)
+                sleep(1)
+                buttons = driver.find_elements(By.TAG_NAME, "button")
 
-dt_pickup_conclusion = [button for button in buttons if button.text == "Concluído"][0]
-dt_pickup_conclusion.click()
+                dt_pickup_conclusion = [button for button in buttons if button.text == "Concluído"][0]
+                dt_pickup_conclusion.click()
 
-search_button = [button for button in buttons if button.accessible_name == "Pesquisar"][0]
-search_button.click()
+                search_bt = [button for button in buttons if button.text == "Pesquisar"][0]
+                search_bt.click()
+                first = False
 
-time.sleep(3)
-flights = driver.find_elements(By.CLASS_NAME, "pIav2d")
+            sleep(3)
+            flights = driver.find_elements(By.CLASS_NAME, "pIav2d")
+            if flights:
+                lst_flight_prices = []
+                for flight in flights:
+                    if "R$" in flight.text:
+                        price = int(re.search("R\$.+", flight.text).group().split()[1].replace(".", ""))
+                        lst_flight_prices.append(price)
+                min_price = str(min(lst_flight_prices))
+            else:
+                min_price = None
 
-driver.close()
+            temp_lst = []
+            temp_lst.append(datetime.today().strftime("%d/%m/%Y %H:%M:%S"))
+            temp_lst.append(departure)
+            temp_lst.append(arrival)
+            temp_lst.append(departure_dt)
+            temp_lst.append(comeback_dt)
+            temp_lst.append(min_price)
+            lst_flighs.append(temp_lst)
+        
+    driver.close()
+    return lst_flighs
 
+def store_data(lst_flighs):
+    con = sqlite3.connect("flights.db")
+    cur = con.cursor()
+    # cur.execute("""CREATE TABLE IF NOT EXISTS flights (search_dt DATETIME, departure_airport NVARCHAR(3),
+    #                arrival_airport NVARCHAR(3), departure_dt DATETIME, comeback_dt DATETIME, price INT)""")
+    for flight in lst_flighs:
+        insert_data = "".join(["'" + data + "'," for data in flight[:-1]])
+        if flight[-1] is not None:
+            cur.execute(f"""INSERT INTO flights VALUES ({insert_data + flight[-1]});""")
+        else:
+            cur.execute(f"""INSERT INTO flights VALUES ({insert_data + "NULL"});""")
+    con.commit()
 
+if __name__ == '__main__':
+    airport_from = ["GRU", "VCP", "GIG", "SSA", "MAO", "POA"]
+    airport_from = ["MAO"]
+    airport_to = ["LAX", "LAS", "MIA", "CDG", "LIS", "SYD", "EZE", "SCL", "PEK", "DXB", "MEX", "YYZ", "HND", "CPT",
+                  "ORD", "PTY"]
+    airport_to = ["CPT"]
+    departure_dt = "20/09/2023"
+    comeback_dt = "25/09/2023"
 
-# dt_pickup_conclusion = [button for button in buttons if button.accessible_name == "Concluído"][0]
-# dt_pickup_conclusion.click()
-# WebDriverWait(driver, 10).until(EC.presence_of_element_located(input_departure)).send_keys(dt_departure)
-
-
-
-
-# time.sleep(5)
-# input_departure.send_keys(dt_departure)
-#
-# time.sleep(5)
-# input_comeback.send_keys(dt_comeback)
+    lst_flighs = get_web_data(airport_from, airport_to, departure_dt, comeback_dt)
+    store_data(lst_flighs)
