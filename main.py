@@ -1,7 +1,7 @@
 from time import sleep
 from datetime import datetime
+from datetime import timedelta
 import sqlite3
-import regex as re
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -51,7 +51,7 @@ def get_web_data(airport_from, airport_to, departure_dt, comeback_dt):
                         input_departure = _input
 
                 input_departure.click()
-                sleep(1)
+                sleep(2)
                 inputs = driver.find_elements(By.TAG_NAME, "input")
                 input_departure = ""
                 input_comeback = ""
@@ -62,9 +62,9 @@ def get_web_data(airport_from, airport_to, departure_dt, comeback_dt):
                     if "Volta" in acessible_name:
                         input_comeback = _input
 
-                sleep(1)
+                sleep(2)
                 input_departure.send_keys(departure_dt)
-                sleep(1)
+                sleep(2)
                 input_comeback.send_keys(comeback_dt)
                 sleep(1)
                 input_comeback.send_keys(Keys.ENTER)
@@ -118,12 +118,9 @@ def store_data(lst_flighs):
 
 if __name__ == '__main__':
     airport_from = ["GRU", "VCP", "GIG", "SSA", "MAO", "POA"]
-    airport_from = ["MAO"]
-    airport_to = ["LAX", "LAS", "MIA", "CDG", "LIS", "SYD", "EZE", "SCL", "PEK", "DXB", "MEX", "YYZ", "HND", "CPT",
-                  "ORD", "PTY"]
-    airport_to = ["CPT"]
-    departure_dt = "20/09/2023"
-    comeback_dt = "25/09/2023"
+    airport_to = ["LAX", "LAS", "MIA", "CDG", "LIS", "SYD", "EZE", "SCL", "PEK", "DXB", "MEX", "YYZ", "HND", "CPT", "ORD", "PTY"]
+    departure_dt = (datetime.today() + timedelta(days=1)).strftime("%d/%m/%Y")
+    comeback_dt = (datetime.today() + timedelta(days=5)).strftime("%d/%m/%Y")
 
     lst_flighs = get_web_data(airport_from, airport_to, departure_dt, comeback_dt)
     store_data(lst_flighs)
